@@ -23,6 +23,8 @@ class AI:
         self.players_order = players_order
         self.logger = logging.getLogger('AI')
         self.max_transfers = max_transfers
+        self.turn_time = 0.1
+        self.turn_state = "transfer"
 
     def get_all_borders_info(self, board):
         borders = board.get_player_border(self.player_name)
@@ -41,10 +43,9 @@ class AI:
         
         return borders_info
 
-    def get_border_evaluation(self, board, player_name):
+    def get_board_evaluation(self, board, player_name):
         regions = board.get_players_regions(player_name)
         biggest_region = max(regions, key=len)
-        biggest_region_len = len(biggest_region)
 
         count_of_areas_outside_the_biggest_region = 0
         for region in regions:
@@ -58,7 +59,6 @@ class AI:
         weak_enemies = []
 
         for border in borders_info:
-            print(border)
             for enemy in border[2]:
                 print(enemy)
                 if(enemy[3] < -2):
@@ -85,22 +85,28 @@ class AI:
         area.get_dice()
 
         dicewars.ai.utils.possible_attacks()"""
-        
-        #for info in borders_info:
-        #    print(info)
-        #    print('----------------------------------')
 
-        self.get_border_evaluation(board, self.player_name)
-            
-        #for area in borders:
-        #    if(nb_transfers_this_turn >= self.max_transfers):
-        #        break
-        #    neighbourhood_names = area.get_adjacent_areas_names()
-        #    for neighbour_name in neighbourhood_names:
-        #        neighbour = board.get_area(neighbour_name)
-        #        
-        #        if(neighbour.get_owner_name() == self.player_name and nb_transfers_this_turn < self.max_transfers and neighbour.get_dice() > 2 and neighbour not in borders):
-        #            return TransferCommand(neighbour_name, area.get_name())
+        border_evaluation = []
+
+        if(self.turn_state == "transfer"):
+            border_evaluation = self.get_board_evaluation(board, self.player_name)
+            #for area in borders:
+            #    if(nb_transfers_this_turn >= self.max_transfers):
+            #        break
+            #    neighbourhood_names = area.get_adjacent_areas_names()
+            #    for neighbour_name in neighbourhood_names:
+            #        neighbour = board.get_area(neighbour_name)
+            #        
+            #        if(neighbour.get_owner_name() == self.player_name and nb_transfers_this_turn < self.max_transfers and neighbour.get_dice() > 2 and neighbour not in borders):
+            #            return TransferCommand(neighbour_name, area.get_name())
+            self.turn_state = "attack"
+        elif(self.turn_state == "attack"):
+            border_evaluation = self.get_board_evaluation(board, self.player_name)
+            #if no weak enemies -> self.turn_state = "transfer"
+            if(time_left < self.turn_time):
+                return EndTurnCommand()
+            #MAN_X
+
 #
         #all_attacks = list(possible_attacks(board, self.player_name))
         #for attack in all_attacks:
