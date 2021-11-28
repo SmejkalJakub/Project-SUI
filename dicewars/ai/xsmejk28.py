@@ -27,7 +27,7 @@ class AI:
         self.logger = logging.getLogger('AI')
         self.max_transfers = max_transfers
         self.turn_time = 0.1
-        self.turn_state = "transfer"
+        self.turn_state = "attack"
 
     def get_all_borders_info(self, board):
         borders = board.get_player_border(self.player_name)
@@ -81,7 +81,7 @@ class AI:
                 attacks.append([player_border_area, enemy, hold_prob, succ_prob])
         
         #result = board_evaluation[0] + len(board_evaluation[1]) + len(board_evaluation[4][0][0][2]) - len(board_evaluation[3]) - (board_evaluation[0] - len([board_evaluation[1]]))
-        #print(result)
+        ##print(result)
 
         return attacks
     
@@ -119,18 +119,22 @@ class AI:
         dicewars.ai.utils.possible_attacks()"""
        
         #print("TURN")
+
+        switched_from_transfer = False
     
         board_evaluation = []
 
         board_evaluation = self.get_board_evaluation(board, self.player_name)
+        with open('debug.save', 'wb') as f:
+            save_state(f, board, self.player_name, self.players_order)
         if(self.turn_state == "transfer"):
-            if(len(board_evaluation[3]) == 0):
+            if(len(board_evaluation[3]) == 0 or nb_transfers_this_turn == self.max_transfers):
+                switched_from_transfer = True
                 self.turn_state = "attack"
+                
             for area in board_evaluation[3]:
-                #print(area[0][0])
 
                 already_visited_areas = [area[0][0]]
-                #print(area[0][0].get_adjacent_areas_names())
 
                 self.transfer_tree = Tree()
                 self.transfer_tree.create_node([area[0][0].get_name(), area[0][0].get_dice()], area[0][0].get_name())
@@ -138,13 +142,11 @@ class AI:
                 try:
                     self.get_nearest_possible_transfer_neighbors(area[0][0], board, (self.max_transfers - nb_transfers_this_turn), already_visited_areas, area[0][0].get_name())
                 except:
-                    #print("EXCEPT")
                     attacks = list(possible_attacks(board, self.player_name))
                     shuffle(attacks)
                     for source, target in attacks:
                         return BattleCommand(source.get_name(), target.get_name())
                         
-                #print("DONE")
                 #self.transfer_tree.show()            
 
                 max = area[0][0].get_dice()
@@ -153,105 +155,74 @@ class AI:
                 finalNode = None
 
                 if(self.transfer_tree.depth() == 1):
-                    #print("last turn")
                     nodes_in_depth = list(self.transfer_tree.filter_nodes(lambda x: self.transfer_tree.depth(x) == 1))
 
-                    #print(nodes_in_depth)
                     max = area[0][0].get_dice()
                     for node in nodes_in_depth:
-                        #print(self.transfer_tree.get_node[self.transfer_tree.id])
                         if(node.tag[1] + area[0][0].get_name() > max):
-                            max = node.tag[1] + area[0][0].get_name()
+                            max = (node.tag[1] - 1) + area[0][0].get_name()
                             finalId = node.identifier
                             finalNode = node
-
-                    return TransferCommand(finalNode.tag[0], parent.tag[0])
+                    return TransferCommand(finalNode.tag[0], self.transfer_tree.get_node(self.transfer_tree.root).tag[0])
 
                 for i in range(1, self.transfer_tree.depth()):
                     nodes_in_depth = list(self.transfer_tree.filter_nodes(lambda x: self.transfer_tree.depth(x) == i))
+
                     for node in nodes_in_depth:
-                        if(((node.tag[1] + area[0][0].get_dice()) > max) or (i < steps and node.tag[1] + area[0][0].get_dice() == max)):
-                            max = node.tag[1] + area[0][0].get_dice()
+                        if((((node.tag[1] - 1) + area[0][0].get_dice()) > max) or (i < steps and (node.tag[1] + area[0][0].get_dice() == max))):
+                            max = (node.tag[1] - 1) + area[0][0].get_dice()
                             steps = i
                             finalId = node.identifier
                             finalNode = node
-           
-                #print("MAX VALUE: " + str(max))
-                #print("MIN STEPS: " + str(steps))
-                #print("FINAL ID: " + str(finalId))
 
+                if(max == 1):
+                    continue
                 if(finalId != None):
                     parent = self.transfer_tree.parent(finalId)
-                    #print(parent.identifier)
                 else:
                     parent = None
                 
                 if(finalNode != None and parent != None):
-                    #print("TRANSFER")
                     return TransferCommand(finalNode.tag[0], parent.tag[0])
                 else:
-                    #print("BATTLE")
                     self.turn_state = "attack"
                     attacks = list(possible_attacks(board, self.player_name))
                     shuffle(attacks)
                     for source, target in attacks:
                         return BattleCommand(source.get_name(), target.get_name())
 
-
-            #    if(nb_transfers_this_turn >= self.max_transfers):
-            #        self.turn_state = "attack"
-            #        break
-            #    neighbourhood_names = area[0][0].get_adjacent_areas_names()
-            #    for neighbour_name in neighbourhood_names:
-            #        neighbour = board.get_area(neighbour_name)
-            #        if(neighbour.get_owner_name() == self.player_name 
-            #        and nb_transfers_this_turn < self.max_transfers 
-            #        and neighbour.get_dice() > 1 
-            #        and neighbour not in board.get_player_border(self.player_name)):
-            #            self.turn_state = "transfer"
-            #            return TransferCommand(neighbour_name, area[0][0].get_name())
-            #self.turn_state = "attack"
         if(self.turn_state == "attack"):
 
-            if(len(board_evaluation[4]) == 0):
-                self.turn_state = "transfer"
+            #if(len(board_evaluation[4]) == 0):
+            #    if(switched_from_transfer):
+            #        return EndTurnCommand()
+            #    self.turn_state = "transfer"
 
             #if(time_left < self.supposed_turn_time):
-            #    print('end')
-            #    return EndTurnCommand()
+            if(False):
+                attacks = list(possible_attacks(board, self.player_name))
+                shuffle(attacks)
+                for source, target in attacks:
+                    return BattleCommand(source.get_name(), target.get_name())
+            #else:
+            #    possible_best_attacks = self.get_best_turn(board, board_evaluation)
+#
+            #    best_attack = [0, 0, 0, 0]
+            #    for possible_attack in possible_best_attacks:
+            #        if(possible_attack[2] > 0.2):
+            #            if(best_attack[3] < possible_attack[3]):
+            #                best_attack[0] = possible_attack[0]
+            #                best_attack[1] = possible_attack[1]
+            #                best_attack[2] = possible_attack[2]
+            #                best_attack[3] = possible_attack[3]
+#
+            #    if(best_attack[0] == 0):
+            #        attacks = list(possible_attacks(board, self.player_name))
+            #        shuffle(attacks)
+            #        for source, target in attacks:
+            #            return BattleCommand(source.get_name(), target.get_name())
+            #    else:
+            #        return BattleCommand(best_attack[0].get_name(), best_attack[1].get_name())
             else:
-                best_attacks = self.get_best_turn(board, board_evaluation)
-
-                best_attack = [0, 0, 0, 0]
-                for possible_attack in best_attacks:
-                    if(possible_attack[2] > 0.2):
-                        if(best_attack[3] < possible_attack[3]):
-                            best_attack[0] = possible_attack[0]
-                            best_attack[1] = possible_attack[1]
-                            best_attack[2] = possible_attack[2]
-                            best_attack[3] = possible_attack[3]
-                if(best_attack[0] == 0):
-                    return EndTurnCommand()
-                else:
-                    return BattleCommand(best_attack[0].get_name(), best_attack[1].get_name())
-            #MAN_X
+                pass
         return EndTurnCommand()
-#
-        #all_attacks = list(possible_attacks(board, self.player_name))
-        #for attack in all_attacks:
-        #    attacker, defender = attack
-        #    attacker_advantage = attacker.get_dice() - defender.get_dice()
-#
-        #    if(attacker.get_dice() == 8 or attacker_advantage >= 2):
-        #        return BattleCommand(attacker.get_name(), defender.get_name())
-        #
-        #borders = board.get_player_border(self.player_name)
-        #for area in borders:
-        #    if(nb_transfers_this_turn >= self.max_transfers):
-        #        break
-        #    neighbourhood_names = area.get_adjacent_areas_names()
-        #    for neighbour_name in neighbourhood_names:
-        #        neighbour = board.get_area(neighbour_name)
-        #        
-        #        if(neighbour.get_owner_name() == self.player_name and nb_transfers_this_turn < self.max_transfers and neighbour.get_dice() > 2 and neighbour not in borders):
-        #            return TransferCommand(neighbour_name, area.get_name())
