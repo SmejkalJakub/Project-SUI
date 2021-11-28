@@ -2,7 +2,7 @@ import random
 import logging
 from random import shuffle
 
-from dicewars.ai.utils import possible_attacks, probability_of_successful_attack, probability_of_holding_area, save_state
+from dicewars.ai.utils import *
 
 from dicewars.client.ai_driver import BattleCommand, EndTurnCommand, TransferCommand
 
@@ -80,9 +80,6 @@ class AI:
                 succ_prob = probability_of_successful_attack(board, player_border_area.get_name(), enemy.get_name())
                 attacks.append([player_border_area, enemy, hold_prob, succ_prob])
         
-        #result = board_evaluation[0] + len(board_evaluation[1]) + len(board_evaluation[4][0][0][2]) - len(board_evaluation[3]) - (board_evaluation[0] - len([board_evaluation[1]]))
-        ##print(result)
-
         return attacks
     
     def get_nearest_possible_transfer_neighbors(self, area, board, remaining_transfers, already_visited_areas, tree_node):
@@ -118,8 +115,6 @@ class AI:
 
         dicewars.ai.utils.possible_attacks()"""
        
-        #print("TURN")
-
         switched_from_transfer = False
     
         board_evaluation = []
