@@ -208,6 +208,7 @@ class AI:
             y = 0.4
 
             eval = v * evalArray[0] + w * len(evalArray[1]) - x * len(evalArray[3]) + y * len(evalArray[4])
+            #eval = v * player_areas + w * player_biggest_region - x * weak_boarders + y * weak_enemies
 
             boardEvaluation[player] = eval
 
