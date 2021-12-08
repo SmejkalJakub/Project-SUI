@@ -112,7 +112,7 @@ class AI:
         attacks = list(possible_attacks(board, player))
 
         moves = [[board, []]]
-        treshold = 0.01
+        treshold = 0.2
         
         for attack in attacks:
             source = attack[0]
@@ -127,7 +127,7 @@ class AI:
             hold_prob = probability_of_holding_area(board, enemy.get_name(), (source_dice - 1), player)
             succ_prob = probability_of_successful_attack(board, source.get_name(), enemy.get_name())
 
-            prob = hold_prob * succ_prob
+            prob = (0.3 * hold_prob) + (0.7 * succ_prob)
             
             if(prob >= treshold):
                 board = copy.deepcopy(board)
@@ -226,7 +226,7 @@ class AI:
             print(move[0].get_name(), move[1].get_name(), str(move[2]))
             with open('debug.save', 'wb') as f:
                 save_state(f, board, self.player_name, self.players_order)
-            return BattleCommand(move[0], move[1])
+            return BattleCommand(move[0].get_name(), move[1].get_name())
 
         """AI agent's turn
 
