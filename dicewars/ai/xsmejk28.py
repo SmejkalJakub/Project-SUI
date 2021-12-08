@@ -1,5 +1,6 @@
 import random
 import logging
+import copy
 from random import shuffle
 
 from dicewars.ai.utils import *
@@ -8,7 +9,6 @@ from dicewars.client.ai_driver import BattleCommand, EndTurnCommand, TransferCom
 
 from dicewars.client.game.board import *
 from dicewars.client.game.area import *
-from dicewars.server.area import *
 from treelib import Node, Tree
 
 class AI:
@@ -29,7 +29,8 @@ class AI:
         self.max_transfers = max_transfers
         self.turn_time = 0.1
         self.turn_state = "attack"
-
+        self.max_depth = 3
+        
     def get_all_borders_info(self, board):
         borders = board.get_player_border(self.player_name)
 
@@ -98,7 +99,134 @@ class AI:
                     visited.append(neighbour)
                     self.get_nearest_possible_transfer_neighbors(neighbour, board, remaining_transfers - 1, visited, name)
 
+    def next_player(self, current_player):
+        i = 0
+        for index, player in enumerate(self.players_order):
+            if(player == current_player):
+                i = index
+        
+        i = i + 1
+        return self.players_order[i % len(self.players_order)]
+    
+    def possible_moves(self, player, board):
+        attacks = list(possible_attacks(board, player))
+
+        moves = [[board, []]]
+        treshold = 0.01
+        
+        for attack in attacks:
+            source = attack[0]
+            enemy = attack[1]
+            
+            enemy_dice = enemy.get_dice()
+            source_dice = source.get_dice()
+
+            if(source_dice == 1):
+                continue
+
+            hold_prob = probability_of_holding_area(board, enemy.get_name(), (source_dice - 1), player)
+            succ_prob = probability_of_successful_attack(board, source.get_name(), enemy.get_name())
+
+            prob = hold_prob * succ_prob
+            
+            if(prob >= treshold):
+                board = copy.deepcopy(board)
+                enemy.set_owner(source.get_owner_name())
+                enemy.set_dice(source_dice - 1)
+                source.set_dice(1)
+
+                moves.append([board, [source, enemy, player]])
+
+        return moves
+            
+
+    def is_current_better_than_best(self, currentVector, bestVector, player):
+        
+        enemyScore = 0
+        playerScore = 0
+
+        for key, value in currentVector.items():            
+            if(key == player):
+                playerScore = value
+            else:
+                enemyScore += value
+        currentVectorEvaluation = enemyScore - playerScore
+
+        enemyScore = 0
+        for key, value in bestVector.items():            
+            if(key == player):
+                playerScore = value
+            else:
+                enemyScore += value
+        bestVectorEvaluation = enemyScore - playerScore
+
+        if(currentVectorEvaluation <= bestVectorEvaluation):
+            return True
+        else:
+            return False
+
+    def maxN(self, player, depth, board):
+        if(depth == self.max_depth):
+            return self.eval_func(board)
+        
+        possible_moves = self.possible_moves(player, board)
+        next_player = self.next_player(player)
+        
+        bestValVector = {}
+
+        for i in range(len(self.players_order)):
+            if(self.players_order[i] == player):
+                bestValVector[self.players_order[i]] = 0
+            else:
+                bestValVector[self.players_order[i]] = 1000
+        
+        currentValVector = {}
+
+        for possible_move in possible_moves:
+            print(possible_move[0])
+            currentValVector = self.maxN(next_player, depth + 1, possible_move[0])
+            if self.is_current_better_than_best(currentValVector, bestValVector, player):
+                bestValVector = currentValVector
+                best_posible_move = possible_move[1]
+
+        if depth == 0:
+            print(player)
+            print(self.player_name)
+            return best_posible_move
+        else:
+            return bestValVector
+
+       
+
+    def eval_func(self, board):
+        boardEvaluation = {}
+        for player in self.players_order:
+            evalArray = self.get_board_evaluation(board, player)
+            v = 0.5
+            w = 0.55
+            x = 0.3
+            y = 0.4
+
+            eval = v * evalArray[0] + w * len(evalArray[1]) - x * len(evalArray[3]) + y * len(evalArray[4])
+
+            boardEvaluation[player] = eval
+
+        return boardEvaluation
+
     def ai_turn(self, board, nb_moves_this_turn, nb_transfers_this_turn, nb_turns_this_game, time_left):
+        #print("TURN")
+        
+        move = self.maxN(self.player_name, 0, board)
+        print(move)
+        if not move:
+            print("END")
+            return EndTurnCommand()
+        else:
+            print(move[0].get_name(), move[1].get_name(), str(move[2]))
+            with open('debug.save', 'wb') as f:
+                save_state(f, board, self.player_name, self.players_order)
+            return BattleCommand(move[0], move[1])
+
         """AI agent's turn
 
         Get a random area. If it has a possible move, the agent will do it.
