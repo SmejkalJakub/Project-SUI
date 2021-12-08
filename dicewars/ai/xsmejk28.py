@@ -28,8 +28,8 @@ class AI:
         self.logger = logging.getLogger('AI')
         self.max_transfers = max_transfers
         self.turn_time = 0.1
-        self.turn_state = "attack"
-        self.max_depth = 3
+        self.turn_state = "transfer"
+        self.max_depth = 4
         
     def get_all_borders_info(self, board):
         borders = board.get_player_border(self.player_name)
@@ -89,15 +89,15 @@ class AI:
             return
 
         visited = already_visited_areas + []
-
         for neighbour_name in area.get_adjacent_areas_names():
             neighbour = board.get_area(neighbour_name)
             if((neighbour.get_owner_name() == self.player_name) and (neighbour not in board.get_player_border(self.player_name))):
                 if(neighbour not in visited):
-                    name = str(neighbour_name) + str(random.randint(0, 100))
-                    self.transfer_tree.create_node([neighbour_name, neighbour.get_dice()], name, parent=tree_node)                
+                    name = str(neighbour_name) + str(random.randint(0, 10000))
+                    self.transfer_tree.create_node([neighbour_name, neighbour.get_dice()], name, parent=tree_node)  
                     visited.append(neighbour)
                     self.get_nearest_possible_transfer_neighbors(neighbour, board, remaining_transfers - 1, visited, name)
+
 
     def next_player(self, current_player):
         i = 0
@@ -127,7 +127,7 @@ class AI:
             hold_prob = probability_of_holding_area(board, enemy.get_name(), (source_dice - 1), player)
             succ_prob = probability_of_successful_attack(board, source.get_name(), enemy.get_name())
 
-            prob = (0.3 * hold_prob) + (0.7 * succ_prob)
+            prob = (0.4 * hold_prob) + (0.6 * succ_prob)
             
             if(prob >= treshold):
                 board = copy.deepcopy(board)
@@ -183,20 +183,19 @@ class AI:
         currentValVector = {}
 
         for possible_move in possible_moves:
-            print(possible_move[0])
             currentValVector = self.maxN(next_player, depth + 1, possible_move[0])
             if self.is_current_better_than_best(currentValVector, bestValVector, player):
                 bestValVector = currentValVector
                 best_posible_move = possible_move[1]
+            else:
+                best_posible_move = possible_move[1]
 
         if depth == 0:
-            print(player)
-            print(self.player_name)
+            #print(player)
+            #print(self.player_name)
             return best_posible_move
         else:
             return bestValVector
-
-       
 
     def eval_func(self, board):
         boardEvaluation = {}
@@ -215,19 +214,6 @@ class AI:
         return boardEvaluation
 
     def ai_turn(self, board, nb_moves_this_turn, nb_transfers_this_turn, nb_turns_this_game, time_left):
-        #print("TURN")
-        
-        move = self.maxN(self.player_name, 0, board)
-        print(move)
-        if not move:
-            print("END")
-            return EndTurnCommand()
-        else:
-            print(move[0].get_name(), move[1].get_name(), str(move[2]))
-            with open('debug.save', 'wb') as f:
-                save_state(f, board, self.player_name, self.players_order)
-            return BattleCommand(move[0].get_name(), move[1].get_name())
-
         """AI agent's turn
 
         Get a random area. If it has a possible move, the agent will do it.
@@ -252,100 +238,70 @@ class AI:
         board_evaluation = self.get_board_evaluation(board, self.player_name)
         if(self.turn_state == "transfer"):
             if(len(board_evaluation[3]) == 0 or nb_transfers_this_turn == self.max_transfers):
+
                 switched_from_transfer = True
+                #print("TRANSFER IF")
                 self.turn_state = "attack"
-                
-            for area in board_evaluation[3]:
+            else:
+                #print("TRANSFER ELSE")
+                for area in board_evaluation[3]:
+                    already_visited_areas = [area[0][0]]
 
-                already_visited_areas = [area[0][0]]
+                    self.transfer_tree = Tree()
+                    self.transfer_tree.create_node([area[0][0].get_name(), area[0][0].get_dice()], area[0][0].get_name())
 
-                self.transfer_tree = Tree()
-                self.transfer_tree.create_node([area[0][0].get_name(), area[0][0].get_dice()], area[0][0].get_name())
-
-                try:
                     self.get_nearest_possible_transfer_neighbors(area[0][0], board, (self.max_transfers - nb_transfers_this_turn), already_visited_areas, area[0][0].get_name())
-                except:
-                    attacks = list(possible_attacks(board, self.player_name))
-                    shuffle(attacks)
-                    for source, target in attacks:
-                        return BattleCommand(source.get_name(), target.get_name())
-                        
-                #self.transfer_tree.show()            
 
-                max = area[0][0].get_dice()
-                steps = 10000
-                finalId = None
-                finalNode = None
-
-                if(self.transfer_tree.depth() == 1):
-                    nodes_in_depth = list(self.transfer_tree.filter_nodes(lambda x: self.transfer_tree.depth(x) == 1))
+                    #self.transfer_tree.show()            
 
                     max = area[0][0].get_dice()
-                    for node in nodes_in_depth:
-                        if(node.tag[1] + area[0][0].get_name() > max):
-                            max = (node.tag[1] - 1) + area[0][0].get_name()
-                            finalId = node.identifier
-                            finalNode = node
-                    return TransferCommand(finalNode.tag[0], self.transfer_tree.get_node(self.transfer_tree.root).tag[0])
+                    steps = 10000
+                    finalId = None
+                    finalNode = None
 
-                for i in range(1, self.transfer_tree.depth()):
-                    nodes_in_depth = list(self.transfer_tree.filter_nodes(lambda x: self.transfer_tree.depth(x) == i))
+                    if(self.transfer_tree.depth() == 1):
+                        nodes_in_depth = list(self.transfer_tree.filter_nodes(lambda x: self.transfer_tree.depth(x) == 1))
 
-                    for node in nodes_in_depth:
-                        if((((node.tag[1] - 1) + area[0][0].get_dice()) > max) or (i < steps and (node.tag[1] + area[0][0].get_dice() == max))):
-                            max = (node.tag[1] - 1) + area[0][0].get_dice()
-                            steps = i
-                            finalId = node.identifier
-                            finalNode = node
+                        max = area[0][0].get_dice()
+                        for node in nodes_in_depth:
+                            if(node.tag[1] + area[0][0].get_name() > max):
+                                max = (node.tag[1] - 1) + area[0][0].get_name()
+                                finalId = node.identifier
+                                finalNode = node
+                        #print("TRANSFER")
+                        return TransferCommand(finalNode.tag[0], self.transfer_tree.get_node(self.transfer_tree.root).tag[0])
 
-                if(max == 1):
-                    continue
-                if(finalId != None):
-                    parent = self.transfer_tree.parent(finalId)
-                else:
-                    parent = None
-                
-                if(finalNode != None and parent != None):
-                    return TransferCommand(finalNode.tag[0], parent.tag[0])
-                else:
-                    self.turn_state = "attack"
-                    attacks = list(possible_attacks(board, self.player_name))
-                    shuffle(attacks)
-                    for source, target in attacks:
-                        return BattleCommand(source.get_name(), target.get_name())
+                    for i in range(1, self.transfer_tree.depth()):
+                        nodes_in_depth = list(self.transfer_tree.filter_nodes(lambda x: self.transfer_tree.depth(x) == i))
+
+                        for node in nodes_in_depth:
+                            if((((node.tag[1] - 1) + area[0][0].get_dice()) > max) or (i < steps and (node.tag[1] + area[0][0].get_dice() == max))):
+                                max = (node.tag[1] - 1) + area[0][0].get_dice()
+                                steps = i
+                                finalId = node.identifier
+                                finalNode = node
+
+                    if(max == 1):
+                        continue
+                    if(finalId != None):
+                        parent = self.transfer_tree.parent(finalId)
+                    else:
+                        parent = None
+                    
+                    if(finalNode != None and parent != None):
+                        #print("TRANSFER")
+                        return TransferCommand(finalNode.tag[0], parent.tag[0])
+                    else:
+                        self.turn_state = "attack"
 
         if(self.turn_state == "attack"):
-
-            #if(len(board_evaluation[4]) == 0):
-            #    if(switched_from_transfer):
-            #        return EndTurnCommand()
-            #    self.turn_state = "transfer"
-
-            #if(time_left < self.supposed_turn_time):
-            if(False):
-                attacks = list(possible_attacks(board, self.player_name))
-                shuffle(attacks)
-                for source, target in attacks:
-                    return BattleCommand(source.get_name(), target.get_name())
-            #else:
-            #    possible_best_attacks = self.get_best_turn(board, board_evaluation)
-#
-            #    best_attack = [0, 0, 0, 0]
-            #    for possible_attack in possible_best_attacks:
-            #        if(possible_attack[2] > 0.2):
-            #            if(best_attack[3] < possible_attack[3]):
-            #                best_attack[0] = possible_attack[0]
-            #                best_attack[1] = possible_attack[1]
-            #                best_attack[2] = possible_attack[2]
-            #                best_attack[3] = possible_attack[3]
-#
-            #    if(best_attack[0] == 0):
-            #        attacks = list(possible_attacks(board, self.player_name))
-            #        shuffle(attacks)
-            #        for source, target in attacks:
-            #            return BattleCommand(source.get_name(), target.get_name())
-            #    else:
-            #        return BattleCommand(best_attack[0].get_name(), best_attack[1].get_name())
+            move = self.maxN(self.player_name, 0, board)
+            if not move:
+                #print("END")
+                self.turn_state = "transfer"
+                return EndTurnCommand()
             else:
-                pass
+                #print("ATTACK")
+                self.turn_state = "transfer"
+                return BattleCommand(move[0].get_name(), move[1].get_name())
         return EndTurnCommand()
