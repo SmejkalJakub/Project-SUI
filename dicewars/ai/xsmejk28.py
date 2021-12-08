@@ -8,6 +8,7 @@ from dicewars.client.ai_driver import BattleCommand, EndTurnCommand, TransferCom
 
 from dicewars.client.game.board import *
 from dicewars.client.game.area import *
+from dicewars.server.area import *
 from treelib import Node, Tree
 
 class AI:
@@ -120,8 +121,6 @@ class AI:
         board_evaluation = []
 
         board_evaluation = self.get_board_evaluation(board, self.player_name)
-        with open('debug.save', 'wb') as f:
-            save_state(f, board, self.player_name, self.players_order)
         if(self.turn_state == "transfer"):
             if(len(board_evaluation[3]) == 0 or nb_transfers_this_turn == self.max_transfers):
                 switched_from_transfer = True
