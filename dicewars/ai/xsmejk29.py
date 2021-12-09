@@ -127,14 +127,11 @@ class AI:
             if(source_dice == 8):
                 hold_prob = 1
                 succ_prob = 1
-                # prob = 1
             else:
                 hold_prob = probability_of_holding_area(board, enemy.get_name(), (source_dice - 1), player)
                 succ_prob = probability_of_successful_attack(board, source.get_name(), enemy.get_name())
-                # prob = (0.3 * hold_prob) + (0.7 * succ_prob)
             
-            # if(prob >= treshold):
-            if(hold_prob >= 0.3 and succ_prob >= 0.5): #tohle je zatim asi nejlepsi podminka
+            if(hold_prob >= 0.3 and succ_prob >= 0.7):
                 board = copy.deepcopy(board)
                 enemy.set_owner(source.get_owner_name())
                 enemy.set_dice(source_dice - 1)
@@ -181,10 +178,6 @@ class AI:
 
         for i in range(len(self.players_order)):
             bestValVector[self.players_order[i]] = 0
-            # if(self.players_order[i] == player):
-            #     bestValVector[self.players_order[i]] = 0
-            # else:
-            #     bestValVector[self.players_order[i]] = 1000
         
         currentValVector = {}
 
@@ -194,6 +187,8 @@ class AI:
                 self.ify += 1
                 bestValVector = currentValVector
                 best_posible_move = possible_move[1]
+            # else:
+            #     best_posible_move = possible_move[1]
 
         if depth == 0:
             return best_posible_move
@@ -307,5 +302,5 @@ class AI:
                 # print("ATTACK")
                 self.turn_state = "transfer"
                 return BattleCommand(move[0].get_name(), move[1].get_name())
-        # print('28: ' + str(self.ify))
+        # print('29: ' + str(self.ify))
         return EndTurnCommand()
