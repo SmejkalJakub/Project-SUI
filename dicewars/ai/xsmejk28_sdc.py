@@ -134,7 +134,7 @@ class AI:
                 # prob = (0.3 * hold_prob) + (0.7 * succ_prob)
             
             # if(prob >= treshold):
-            if(hold_prob >= 0.3 and succ_prob >= 0.5): #tohle je zatim asi nejlepsi podminka
+            if(hold_prob >= .0640 and succ_prob >= .5350): #tohle je zatim asi nejlepsi podminka
                 board = copy.deepcopy(board)
                 enemy.set_owner(source.get_owner_name())
                 enemy.set_dice(source_dice - 1)
@@ -204,10 +204,10 @@ class AI:
         boardEvaluation = {}
         for player in self.players_order:
             evalArray = self.get_board_evaluation(board, player)
-            v = 0.5
-            w = 0.55
-            x = 0.3
-            y = 0.4
+            v = .1720
+            w = .0510
+            x = .7620
+            y = .1290
 
             eval = v * evalArray[0] + w * len(evalArray[1]) - x * len(evalArray[3]) + y * len(evalArray[4])
             #eval = v * player_areas + w * player_biggest_region - x * weak_boarders + y * weak_enemies
