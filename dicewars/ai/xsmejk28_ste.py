@@ -94,11 +94,10 @@ class AI:
             neighbour = board.get_area(neighbour_name)
             if((neighbour.get_owner_name() == self.player_name) and (neighbour not in board.get_player_border(self.player_name))):
                 if(neighbour not in visited):
-                    name = str(neighbour_name) + str(random.randint(0, 10000))
+                    name = str(neighbour_name) + str(random.randint(0, 50000)) + str(random.randint(0, 40000)) + str(random.randint(0, 150000))
                     self.transfer_tree.create_node([neighbour_name, neighbour.get_dice()], name, parent=tree_node)  
                     visited.append(neighbour)
                     self.get_nearest_possible_transfer_neighbors(neighbour, board, remaining_transfers - 1, visited, name)
-
 
     def next_player(self, current_player):
         i = 0
@@ -134,7 +133,7 @@ class AI:
                 # prob = (0.3 * hold_prob) + (0.7 * succ_prob)
             
             # if(prob >= treshold):
-            if(hold_prob >= .1150 and succ_prob >= .4030): #tohle je zatim asi nejlepsi podminka
+            if(hold_prob >= .6770 and succ_prob >= .5880): #tohle je zatim asi nejlepsi podminka
                 board = copy.deepcopy(board)
                 enemy.set_owner(source.get_owner_name())
                 enemy.set_dice(source_dice - 1)
@@ -144,7 +143,6 @@ class AI:
 
         return moves
             
-
     def is_current_better_than_best(self, currentVector, bestVector, player):
         
         enemyScore = 0
@@ -204,10 +202,10 @@ class AI:
         boardEvaluation = {}
         for player in self.players_order:
             evalArray = self.get_board_evaluation(board, player)
-            v = .6280
-            w = .9040
-            x = .2500
-            y = .0310
+            v = .4510
+            w = .6240
+            x = .0780
+            y = .5210
 
             eval = v * evalArray[0] + w * len(evalArray[1]) - x * len(evalArray[3]) + y * len(evalArray[4])
             #eval = v * player_areas + w * player_biggest_region - x * weak_boarders + y * weak_enemies
@@ -234,30 +232,38 @@ class AI:
 
         dicewars.ai.utils.possible_attacks()"""
        
-        switched_from_transfer = False
-    
-        board_evaluation = []
-
-        board_evaluation = self.get_board_evaluation(board, self.player_name)
         if(self.turn_state == "transfer"):
-            if(len(board_evaluation[3]) == 0 or nb_transfers_this_turn == self.max_transfers):
-
-                switched_from_transfer = True
+            skiped = 0
+            number_of_borders = len(board.get_player_border(self.player_name))
+            if(nb_transfers_this_turn == self.max_transfers):
                 #print("TRANSFER IF")
                 self.turn_state = "attack"
             else:
                 #print("TRANSFER ELSE")
-                for area in board_evaluation[3]:
-                    already_visited_areas = [area[0][0]]
+
+                borders = board.get_player_border(self.player_name)
+                borders_with_dices = []
+                for area in borders:
+                    borders_with_dices.append([area, area.get_dice()])
+
+                borders_with_dices.sort(key=lambda x:x[1])
+                for i, area in enumerate(borders_with_dices):
+                    if(area[0].get_dice() >= 7):
+                        skiped += 1
+                        if(skiped == number_of_borders or i == (len(borders_with_dices) - 1)):
+                            self.turn_state = "attack"
+                            break
+                        continue
+                    already_visited_areas = [area[0]]
 
                     self.transfer_tree = Tree()
-                    self.transfer_tree.create_node([area[0][0].get_name(), area[0][0].get_dice()], area[0][0].get_name())
+                    self.transfer_tree.create_node([area[0].get_name(), area[0].get_dice()], area[0].get_name())
 
-                    self.get_nearest_possible_transfer_neighbors(area[0][0], board, (self.max_transfers - nb_transfers_this_turn), already_visited_areas, area[0][0].get_name())
+                    self.get_nearest_possible_transfer_neighbors(area[0], board, (self.max_transfers - nb_transfers_this_turn), already_visited_areas, area[0].get_name())
 
-                    #self.transfer_tree.show()            
+                    #self.transfer_tree.show()      
 
-                    max = area[0][0].get_dice()
+                    max = area[0].get_dice()
                     steps = 10000
                     finalId = None
                     finalNode = None
@@ -265,21 +271,23 @@ class AI:
                     if(self.transfer_tree.depth() == 1):
                         nodes_in_depth = list(self.transfer_tree.filter_nodes(lambda x: self.transfer_tree.depth(x) == 1))
 
-                        max = area[0][0].get_dice()
+                        max = area[0].get_dice()
                         for node in nodes_in_depth:
-                            if(node.tag[1] + area[0][0].get_name() > max):
-                                max = (node.tag[1] - 1) + area[0][0].get_name()
+                            if(node.tag[1] + area[0].get_name() > max):
+                                max = (node.tag[1] - 1) + area[0].get_name()
                                 finalId = node.identifier
                                 finalNode = node
-                        # print("TRANSFER")
+                        #print("TRANSFER")
+                        if(finalNode == None):
+                            self.turn_state = "attack"
+                            break
                         return TransferCommand(finalNode.tag[0], self.transfer_tree.get_node(self.transfer_tree.root).tag[0])
-
                     for i in range(1, self.transfer_tree.depth()):
                         nodes_in_depth = list(self.transfer_tree.filter_nodes(lambda x: self.transfer_tree.depth(x) == i))
 
                         for node in nodes_in_depth:
-                            if((((node.tag[1] - 1) + area[0][0].get_dice()) > max) or (i < steps and (node.tag[1] + area[0][0].get_dice() == max))):
-                                max = (node.tag[1] - 1) + area[0][0].get_dice()
+                            if((((node.tag[1] - 1) + area[0].get_dice()) > max) or (i < steps and (node.tag[1] + area[0].get_dice() == max))):
+                                max = (node.tag[1] - 1) + area[0].get_dice()
                                 steps = i
                                 finalId = node.identifier
                                 finalNode = node
@@ -300,11 +308,11 @@ class AI:
         if(self.turn_state == "attack"):
             move = self.maxN(self.player_name, 0, board)
             if not move:
-                # print("END")
+                #print("END")
                 self.turn_state = "transfer"
                 return EndTurnCommand()
             else:
-                # print("ATTACK")
+                #print("ATTACK")
                 self.turn_state = "transfer"
                 return BattleCommand(move[0].get_name(), move[1].get_name())
         # print('28: ' + str(self.ify))
