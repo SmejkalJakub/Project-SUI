@@ -1,15 +1,4 @@
 #!/bin/bash
-v=0.5
-w=0.55
-x=0.3
-y=0.4
-
-treshold=0.2
-
-hold_prob=0.3
-succ_prob=0.5
-
-itterations=10
 
 for j in {0..80..1}
 do
@@ -23,13 +12,10 @@ do
     y=$(echo "scale=4;$random/1000" | bc)
     random=$(( $RANDOM % 1000 ))
 
-    treshold=$(echo "scale=4;$random/1000" | bc)
     random=$(( $RANDOM % 1000 ))
     succ_prob=$(echo "scale=4;$random/1000" | bc)
     random=$(( $RANDOM % 1000 ))
     hold_prob=$(echo "scale=4;$random/1000" | bc)
-
-    iteration_number_of_wins=0
 
     echo "v = $v"
     echo "w = $w"
@@ -46,18 +32,15 @@ do
 
     sed -i "s/if(hold_prob >= 0\..* and succ_prob >= 0\..*): #tohle je zatim asi nejlepsi podminka/if(hold_prob >= $hold_prob and succ_prob >= $succ_prob): #tohle je zatim asi nejlepsi podminka/" dicewars/ai/xsmejk28_ste.py
 
+    result=$(python3 ./scripts/dicewars-tournament.py -g 4 -n 100 -b 101 -s 1337)
+    tmp=${result#*xsmejk28_ste}
+    result_value=${tmp#*xsmejk28_ste}
+    echo $result_value
 
-    for i in $(seq 1 $((itterations / 2)))
-    do
-        result=$(python3 ./scripts/dicewars-ai-only.py -r -b 11 -o 22 -s 33 -c 44 -n $(($itterations - 1)) -l ../logs --ai dt.ste xsmejk28_ste)
-        result_value=${result#*\'xsmejk28_ste \(AI\)\':}
-
-        number_of_wins=$(echo $result_value | awk '{print substr($result_value,0,1)}')
-        iteration_number_of_wins=$((iteration_number_of_wins + number_of_wins))
-    done
+    echo $percentage_wins
 
     echo '------------------------------------------------------------------'
-    average_wins=$(echo "scale=4;$iteration_number_of_wins/$itterations" | bc) 
-    echo $average_wins
+    percentage_wins=$(echo $result_value | awk '{print substr($result_value,0,4)}')
+    echo $percentage_wins
     echo '------------------------------------------------------------------'
 done

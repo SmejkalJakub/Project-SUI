@@ -220,18 +220,7 @@ class AI:
         Get a random area. If it has a possible move, the agent will do it.
         If there are no more moves, the agent ends its turn.
         """
-        
-        """board.get_player_areas()
-        board.get_player_border()
-
-        board.get_players_regions()
-
-        area.get_adjacent_areas_names()
-        area.get_owner_name()
-        area.get_dice()
-
-        dicewars.ai.utils.possible_attacks()"""
-       
+               
         if(self.turn_state == "transfer"):
             skiped = 0
             number_of_borders = len(board.get_player_border(self.player_name))
