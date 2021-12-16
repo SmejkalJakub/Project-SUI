@@ -6,6 +6,7 @@ from random import shuffle
 from dicewars.ai.utils import *
 
 from dicewars.client.ai_driver import BattleCommand, EndTurnCommand, TransferCommand
+from dicewars.ai.kb.move_selection import get_transfer_to_border, get_transfer_from_endangered
 
 from dicewars.client.game.board import *
 from dicewars.client.game.area import *
@@ -31,7 +32,7 @@ class AI:
         self.turn_state = "transfer"
         self.max_depth = 5
         self.ify = 0
-        self.no_escape = False
+        self.escape_transfers = 1
         
     def get_all_borders_info(self, board):
         borders = board.get_player_border(self.player_name)
@@ -233,11 +234,10 @@ class AI:
 
         dicewars.ai.utils.possible_attacks()"""
 
-       
         if(self.turn_state == "transfer"):
             skiped = 0
             number_of_borders = len(board.get_player_border(self.player_name))
-            if(nb_transfers_this_turn == self.max_transfers):
+            if(nb_transfers_this_turn >= self.max_transfers - self.escape_transfers):
                 #print("TRANSFER IF")
                 self.turn_state = "attack"
             else:
@@ -260,9 +260,9 @@ class AI:
 
                     self.transfer_tree = Tree()
                     self.transfer_tree.create_node([area[0].get_name(), area[0].get_dice()], area[0].get_name())
-
-                    self.get_nearest_possible_transfer_neighbors(area[0], board, (self.max_transfers + 1 - nb_transfers_this_turn), already_visited_areas, area[0].get_name())
-
+                    
+                    self.get_nearest_possible_transfer_neighbors(area[0], board, min(self.max_transfers - self.escape_transfers,self.max_transfers - nb_transfers_this_turn), already_visited_areas, area[0].get_name())
+                    
                     #self.transfer_tree.show()      
 
                     max = area[0].get_dice()
@@ -315,59 +315,58 @@ class AI:
                 self.turn_state = "transfer"
                 return BattleCommand(move[0].get_name(), move[1].get_name())
 
-        if(self.turn_state == "escape" and nb_transfers_this_turn < self.max_transfers):
-            self.no_escape = False
+        if(self.turn_state == "escape" \
+            and nb_transfers_this_turn < self.max_transfers):
             borders = board.get_player_border(self.player_name)
             borders_with_dices = []
             for area in borders:
                 borders_with_dices.append([area, area.get_dice()])
 
+            # sort border areas by number of dices
             borders_with_dices.sort(key=lambda x:x[1])
 
-            p = []
+            possible_escapes = []
             for area in borders_with_dices:
                 if(area[0].get_dice() == 1):
                     continue
-                player_areas = []
-                for a in area[0].get_adjacent_areas_names():
-                    regions = board.get_players_regions(self.player_name)
+                player_adj_areas = []
+                for adj_area_name in area[0].get_adjacent_areas_names():
+                    player_areas = board.get_players_regions(self.player_name)
                     own_a = False
-                    # if 'a' is player's region -> own_a = True
-                    for i in regions:
-                        if a in i:
+                    # if adj_area is player's area -> own_a = True
+                    for i in player_areas:
+                        if adj_area_name in i:
                             own_a = True
-                    # if 'a' is player's region
                     if(own_a):
-                        p_a = board.get_area(a)
-                        # if there is free capacity to move dices to 'a'
-                        if(p_a.get_dice() + (p_a.get_dice() - 1) <= 8):
-                            player_areas.append([p_a, p_a.get_dice()])
+                        adj_area = board.get_area(adj_area_name)
+                        # if there is free capacity to move dices to adj_area
+                        if(adj_area.get_dice() + (adj_area.get_dice() - 1) <= 8):
+                            player_adj_areas.append([adj_area, adj_area.get_dice()])
                 # no area to move dices -> continue
-                if(not player_areas):
+                if(not player_adj_areas):
                     continue
                 # sort areas by number of dices
-                player_areas.sort(key=lambda x:x[1])
+                player_adj_areas.sort(key=lambda x:x[1])
                 hold_p = probability_of_holding_area(board, area[0].get_name(), area[0].get_dice(), self.player_name)
                 # if hold prob is less than 0.3 append([number of dices on area, area name, adjacent area for transfer, hold prob])
                 if(hold_p < 0.3):
-                    p.append([area[0].get_dice(), area[0].get_name(), player_areas[0][0].get_name(), hold_p])
-
-            if(not p):
+                    possible_escapes.append([area[0].get_dice(), area[0].get_name(), player_adj_areas[0][0].get_name(), hold_p])
+            # no espace transfer found
+            if(not possible_escapes):
                 self.turn_state = "transfer"
-                self.no_escape = True
                 return EndTurnCommand()
 
             # sort by hold prob
-            p.sort(key=lambda x:x[3]) 
+            possible_escapes.sort(key=lambda x:x[3])
 
-            # if list p contains more than 1 elem transfer dices from area with more dices from the two most endagered areas
-            if(len(p) > 1 and p[0][0] < p[1][0]):
+            # if possible_escapes contains more than 1 element 
+            # compare first two possible escapes and transfer the one with more dices
+            if(len(possible_escapes) > 1 and possible_escapes[0][0] < possible_escapes[1][0]):
                 self.turn_state = "transfer"
-                return TransferCommand(p[1][1], p[1][2])
+                return TransferCommand(possible_escapes[1][1], possible_escapes[1][2])
             else:
                 self.turn_state = "transfer"
-                return TransferCommand(p[0][1], p[0][2])
-
+                return TransferCommand(possible_escapes[0][1], possible_escapes[0][2])
 
         self.turn_state = "transfer"
         return EndTurnCommand()
