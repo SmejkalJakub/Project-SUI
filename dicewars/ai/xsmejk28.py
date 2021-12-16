@@ -20,10 +20,11 @@ class AI:
         players_order : Array with players order
         logger : Logger instance
         max_transfers : Max allowed transfers for players turn
-        turn_time : Average time for attack
         turn_state : FSA state for the AI, starts with transfer every turn
         max_depth : Max depth that the Max N will go into 
+        escape_transfers : Number of transfers reserved for escape phase
     """
+
     def __init__(self, player_name, board, players_order, max_transfers):
         """Initialization of the class parameters
         """
@@ -31,19 +32,18 @@ class AI:
         self.players_order = players_order
         self.logger = logging.getLogger('AI')
         self.max_transfers = max_transfers
-        self.turn_time = 0.1
         self.turn_state = "transfer"
         self.max_depth = 4
         self.escape_transfers = 1
 
     def get_all_borders_info(self, board):
-        """Get info about all the borders and enemies on the borders
+        """Get info about all borders and enemies on the borders
 
         Args:
             board : instance of a game board
 
         Returns:
-            array of borders that belongs to the AI player and enemy areas adjacent to them with a dice advantage
+            array of borders that belongs to the AI player and enemy areas adjacent to them with a dice advantages
         """
         borders = board.get_player_border(self.player_name)
         borders_info = []
@@ -69,7 +69,7 @@ class AI:
             player_name : name of the player for whom to get the evaluation
 
         Returns:
-            array with all the information about the current board state for the given player
+            array with information about the current board state for the given player
         """
 
         regions = board.get_players_regions(player_name)
@@ -102,7 +102,7 @@ class AI:
             area : current area
             board : instance of the game board
             remaining_transfers : number of remaining transfers in the turn
-            already_visited_areas : array toi prevent loops
+            already_visited_areas : array to prevent loops
             tree_node : parent node in tree (neighbor that called this method)
         """
 
@@ -148,14 +148,14 @@ class AI:
         return self.players_order[i % len(self.players_order)]
     
     def possible_moves(self, player, board):
-        """Simulates all possible moves and append it to the final array based on successful probability and hold probability
+        """Simulates all possible moves and append it to the final array based on success and hold probability
 
         Args:
             player : player that is on turn
             board : current board instance
 
         Returns:
-            array of arrays. Each array contains the board instance and the turn that should be done
+            array of arrays - each array contains the board instance and the turn that should be done
         """
         attacks = list(possible_attacks(board, player))
 
@@ -187,15 +187,15 @@ class AI:
         return moves
             
     def is_current_better_than_best(self, currentVector, bestVector, player):
-        """Simple method that just decides if the current state is better than the best one
+        """Method that just decides if the current state is better than the best one
 
         Args:
             currentVector : vector with current board evaluation for each player
-            bestVector : vector with best board evaluation for each player (discovered earlier)
-            player : player for whom the current state should better
+            bestVector : vector with the best board evaluation for each player (discovered earlier)
+            player : player for whom the current state should be better
 
         Returns:
-            True if the current state is better than the best. False if the best is better
+            True if the current state is better than the best. False if the best is better.
         """
         
         enemyScore = 0
@@ -222,16 +222,16 @@ class AI:
             return False
 
     def maxN(self, player, depth, board):
-        """Implementation of Max N algorithm that decides the best attack possible for the current turn. Recursive method
+        """Implementation of MaxN algorithm that finds the best attack for the current turn. Recursive method.
 
         Args:
-            player : player name that the Max N should favor
-            depth : max depth that the Max N should check
+            player : player name for whom to find the best attack
+            depth : max depth of MaxN tree
             board : current board instance
 
         Returns:
-            if not in the root (first call of this method) it returns vector with best possible values. 
-            If in the root it returns best possible attack for the agent to execute.
+            If it is not in the root (first call of this method) it returns vector with best possible values. 
+            If it is in the root it returns best possible attack for the agent to execute.
         """
         if(depth == self.max_depth):
             return self.eval_func(board)
@@ -258,7 +258,7 @@ class AI:
             return bestValVector
 
     def eval_func(self, board):
-        """Evaluation function that evaluates the current board state
+        """Function that evaluates the current board state
 
         Args:
             board : board instance that should be evaluated
@@ -279,71 +279,69 @@ class AI:
 
         return boardEvaluation
 
+    def escape(self, board):
+        """Function that decides the best escape transfer from the borders
 
-    def get_best_transfer(self, board, number_of_borders, nb_transfers_this_turn):
-        skiped = 0
+        Args:
+            board : board instance that should be evaluated
+
+        Returns:
+            None if there is no appropriate escape transfer. 
+            List of source and destination area for transfer command.
+        """
         borders = board.get_player_border(self.player_name)
         borders_with_dices = []
         for area in borders:
             borders_with_dices.append([area, area.get_dice()])
 
+        # sort border areas by number of dices
         borders_with_dices.sort(key=lambda x:x[1])
-        for i, area in enumerate(borders_with_dices):
-            if(area[0].get_dice() >= 7):
-                skiped += 1
-                if(skiped == number_of_borders or i == (len(borders_with_dices) - 1)):
-                    return None, None
+
+        possible_escapes = []
+        for area in borders_with_dices:
+            if(area[0].get_dice() == 1):
                 continue
-            already_visited_areas = [area[0]]
-
-            self.transfer_tree = Tree()
-            self.transfer_tree.create_node([area[0].get_name(), area[0].get_dice()], area[0].get_name())
-
-            self.get_nearest_possible_transfer_neighbors(area[0], board, (self.max_transfers - nb_transfers_this_turn), already_visited_areas, area[0].get_name())
-
-            max = area[0].get_dice()
-            steps = 10000
-            finalId = None
-            finalNode = None
-
-            if(self.transfer_tree.depth() == 1):
-                nodes_in_depth = list(self.transfer_tree.filter_nodes(lambda x: self.transfer_tree.depth(x) == 1))
-
-                max = area[0].get_dice()
-                for node in nodes_in_depth:
-                    if(node.tag[1] + area[0].get_name() > max):
-                        max = (node.tag[1] - 1) + area[0].get_name()
-                        finalId = node.identifier
-                        finalNode = node
-                if(finalNode == None):
-                    return None, None
-                return finalNode.tag[0], self.transfer_tree.get_node(self.transfer_tree.root).tag[0]
-            for i in range(1, self.transfer_tree.depth()):
-                nodes_in_depth = list(self.transfer_tree.filter_nodes(lambda x: self.transfer_tree.depth(x) == i))
-
-                for node in nodes_in_depth:
-                    if((((node.tag[1] - 1) + area[0].get_dice()) > max) or (i < steps and (node.tag[1] + area[0].get_dice() == max))):
-                        max = (node.tag[1] - 1) + area[0].get_dice()
-                        steps = i
-                        finalId = node.identifier
-                        finalNode = node
-
-            if(max == 1):
+            player_adj_areas = []
+            for adj_area_name in area[0].get_adjacent_areas_names():
+                player_areas = board.get_players_regions(self.player_name)
+                own_a = False
+                # if adj_area is player's area -> own_a = True
+                for i in player_areas:
+                    if adj_area_name in i:
+                        own_a = True
+                if(own_a):
+                    adj_area = board.get_area(adj_area_name)
+                    # if there is free capacity to move dices to adj_area
+                    if(adj_area.get_dice() + (adj_area.get_dice() - 1) <= 8):
+                        player_adj_areas.append([adj_area, adj_area.get_dice()])
+            # no area to move dices -> continue
+            if(not player_adj_areas):
                 continue
-            if(finalId != None):
-                parent = self.transfer_tree.parent(finalId)
-            else:
-                parent = None
-            
-            if(finalNode != None and parent != None):
-                return finalNode.tag[0], parent.tag[0]
-            else:
-                return None, None
+            # sort areas by number of dices
+            player_adj_areas.sort(key=lambda x:x[1])
+            hold_p = probability_of_holding_area(board, area[0].get_name(), area[0].get_dice(), self.player_name)
+            # if hold prob is less than 0.3 append([number of dices on area, area name, adjacent area for transfer, hold prob])
+            if(hold_p < 0.3):
+                possible_escapes.append([area[0].get_dice(), area[0].get_name(), player_adj_areas[0][0].get_name(), hold_p])
+        # no espace transfer found
+        if(not possible_escapes):
+            return None
+
+        # sort by hold prob
+        possible_escapes.sort(key=lambda x:x[3])
+
+        # if possible_escapes contains more than 1 element 
+        # compare first two possible escapes and transfer the one with more dices
+        if(len(possible_escapes) > 1 and possible_escapes[0][0] < possible_escapes[1][0]):
+            return [possible_escapes[1][1], possible_escapes[1][2]]
+        else:
+            return [possible_escapes[0][1], possible_escapes[0][2]]
 
     def ai_turn(self, board, nb_moves_this_turn, nb_transfers_this_turn, nb_turns_this_game, time_left):
         """AI agent's turn
            
-           Simple FSA that always starts at transfer state. After the transfers are done the FSA goes into the attack state.
+           Simple FSA that always starts at transfer state. After transfers are done FSA goes into the attack state.
+           After attacks are done FSA turns into escape state.
            This method uses previously declared methods to decide.
         
         """
@@ -422,58 +420,12 @@ class AI:
                 self.turn_state = "transfer"
                 return BattleCommand(move[0].get_name(), move[1].get_name())
 
-        if(self.turn_state == "escape" \
-            and nb_transfers_this_turn < self.max_transfers):
-            borders = board.get_player_border(self.player_name)
-            borders_with_dices = []
-            for area in borders:
-                borders_with_dices.append([area, area.get_dice()])
-
-            # sort border areas by number of dices
-            borders_with_dices.sort(key=lambda x:x[1])
-
-            possible_escapes = []
-            for area in borders_with_dices:
-                if(area[0].get_dice() == 1):
-                    continue
-                player_adj_areas = []
-                for adj_area_name in area[0].get_adjacent_areas_names():
-                    player_areas = board.get_players_regions(self.player_name)
-                    own_a = False
-                    # if adj_area is player's area -> own_a = True
-                    for i in player_areas:
-                        if adj_area_name in i:
-                            own_a = True
-                    if(own_a):
-                        adj_area = board.get_area(adj_area_name)
-                        # if there is free capacity to move dices to adj_area
-                        if(adj_area.get_dice() + (adj_area.get_dice() - 1) <= 8):
-                            player_adj_areas.append([adj_area, adj_area.get_dice()])
-                # no area to move dices -> continue
-                if(not player_adj_areas):
-                    continue
-                # sort areas by number of dices
-                player_adj_areas.sort(key=lambda x:x[1])
-                hold_p = probability_of_holding_area(board, area[0].get_name(), area[0].get_dice(), self.player_name)
-                # if hold prob is less than 0.3 append([number of dices on area, area name, adjacent area for transfer, hold prob])
-                if(hold_p < 0.3):
-                    possible_escapes.append([area[0].get_dice(), area[0].get_name(), player_adj_areas[0][0].get_name(), hold_p])
-            # no espace transfer found
-            if(not possible_escapes):
+        if(self.turn_state == "escape" and nb_transfers_this_turn < self.max_transfers):
+            es = self.escape(board)
+            if es:
                 self.turn_state = "transfer"
-                return EndTurnCommand()
-
-            # sort by hold prob
-            possible_escapes.sort(key=lambda x:x[3])
-
-            # if possible_escapes contains more than 1 element 
-            # compare first two possible escapes and transfer the one with more dices
-            if(len(possible_escapes) > 1 and possible_escapes[0][0] < possible_escapes[1][0]):
-                self.turn_state = "transfer"
-                return TransferCommand(possible_escapes[1][1], possible_escapes[1][2])
-            else:
-                self.turn_state = "transfer"
-                return TransferCommand(possible_escapes[0][1], possible_escapes[0][2])
+                return TransferCommand(es[0], es[1])
+            
 
         self.turn_state = "transfer"
         return EndTurnCommand()
